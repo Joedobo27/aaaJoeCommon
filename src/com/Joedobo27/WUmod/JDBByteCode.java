@@ -1,9 +1,11 @@
 package com.Joedobo27.WUmod;
 
+import javassist.bytecode.BadBytecode;
 import javassist.bytecode.CodeIterator;
 import javassist.bytecode.ConstPool;
 import javassist.bytecode.Mnemonic;
 
+import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -247,7 +249,7 @@ class JDBByteCode {
      * @param ci CodeIterator, This object represents the method which will be changed.
      * @param method String, The name of the target method which will be changed.
      */
-    public static String byteCodeFindReplace(String find, String subFind, String replace, CodeIterator ci, String method) throws Exception {
+    public static String byteCodeFindReplace(String find, String subFind, String replace, CodeIterator ci, String method) throws BadBytecode {
         int findSize;
         int subSize;
         int replacedIndexLines = 0;
@@ -351,7 +353,7 @@ class JDBByteCode {
      * @param ci CodeIterator
      * @return      An ArrayList<ArrayList<HashMap<String, Integer>> object.
      */
-    private static ArrayList<HashMap<String, Integer>> byteCodeMakeArray(CodeIterator ci) throws Exception{
+    private static ArrayList<HashMap<String, Integer>> byteCodeMakeArray(CodeIterator ci) throws BadBytecode{
         int index;
         int bitLine;
         int bitLine2;
@@ -447,7 +449,7 @@ class JDBByteCode {
      * @param destinationPath String type, This is the path to where the file should be created.
      * @return String type and it's a simple success message.
      */
-    public static String byteCodePrint(CodeIterator ci, String method, String destinationPath) throws Exception {
+    public static String byteCodePrint(CodeIterator ci, String method, String destinationPath) throws FileNotFoundException, BadBytecode {
 
         Path printPath = Paths.get(destinationPath, method + " byte code.txt");
         PrintWriter out = new PrintWriter(printPath.toFile());
@@ -500,5 +502,14 @@ class JDBByteCode {
         }
         out.close();
         return method + " printing complete.";
+    }
+
+    public static void constantPoolPrint(ConstPool cp, String clazz, String destinationPath) throws FileNotFoundException {
+        String rtn = "";
+
+        Path printPath = Paths.get(destinationPath, clazz + " constant pool.txt");
+        PrintWriter out = new PrintWriter(printPath.toFile());
+        cp.print(out);
+        out.close();
     }
 }

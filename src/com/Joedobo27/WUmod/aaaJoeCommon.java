@@ -9,9 +9,7 @@ import org.gotti.wurmunlimited.modloader.interfaces.Initable;
 import org.gotti.wurmunlimited.modloader.interfaces.ServerStartedListener;
 import org.gotti.wurmunlimited.modloader.interfaces.WurmMod;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +22,6 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
     public static boolean modifiedCheckSaneAmounts = false;
     public static boolean overwroteForage = false;
     public static boolean overwroteHerb = false;
-    public static ArrayList largeMaterialRatioDifferentials;
 
     private static Logger logger = Logger.getLogger(aaaJoeCommon.class.getName());
 
@@ -38,20 +35,12 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
     private static MethodInfo checkSaneAmountsMInfo;
     private static CodeAttribute checkSaneAmountsAttribute;
     private static CodeIterator checkSaneAmountsIterator;
+    private static MethodInfo CEInitMInfo;
+    private static CodeAttribute CEInitAttribute;
+    private static CodeIterator CEInitIterator;
 
     @Override
     public void onServerStarted() {
-        if (modifiedCheckSaneAmounts) {
-            /*
-            try {
-                Method setLargeMaterialRatioDifferentials = ReflectionUtil.callPrivateMethod(CreationEntry.class,
-                        ReflectionUtil.getMethod(CreationEntry.class, "setLargeMaterialRatioDifferentials"), null);
-                setLargeMaterialRatioDifferentials.invoke(null);
-            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-                e.printStackTrace();
-            }
-            */
-        }
     }
 
     @Override
@@ -60,44 +49,30 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
         logger.log(Level.INFO, "aaaJoeCommon loaded.");
     }
 
-    public static void setLargeMaterialRatioDifferentials() {
-        if (largeMaterialRatioDifferentials == null)
-            largeMaterialRatioDifferentials = new ArrayList<>(Arrays.asList(73));
-    }
-
     //<editor-fold desc="Javassist and bytecode altering section.">
-    private static void setJSSelf() throws Exception{
+    private static void setJSSelf() throws NotFoundException {
         ctcSelf = pool.get(com.Joedobo27.WUmod.aaaJoeCommon.class.getName());
     }
 
-    private static void setJSCreationEntry() throws Exception{
+    private static void setJSCreationEntry() throws NotFoundException {
         ctcCreationEntry = pool.get("com.wurmonline.server.items.CreationEntry");
         cfCreationEntry = ctcCreationEntry.getClassFile();
         cpCreationEntry = cfCreationEntry.getConstPool();
     }
 
-    private static void setJSForage() {
-        try {
-            CtClass ctcForage = pool.get("com.wurmonline.server.behaviours.Forage");
-            CtClass ctcForageJDB = pool.get("com.Joedobo27.WUmod.ForageJDB");
-            CtClass ctcForageDataJDB = pool.get("com.Joedobo27.WUmod.ForageDataJDB");
-
-        } catch (NotFoundException e) {
-            e.printStackTrace();
-        }
+    private static void setJSForage() throws NotFoundException {
+        CtClass ctcForage = pool.get("com.wurmonline.server.behaviours.Forage");
+        CtClass ctcForageJDB = pool.get("com.Joedobo27.WUmod.ForageJDB");
+        CtClass ctcForageDataJDB = pool.get("com.Joedobo27.WUmod.ForageDataJDB");
     }
 
-    private static void setJSHerb() {
-        try {
-            CtClass ctcHerb = pool.get("com.wurmonline.server.behaviours.Herb");
-            CtClass ctcHerbJDB = pool.get("com.Joedobo27.WUmod.HerbJDB");
-            CtClass ctcHerbDataJDB = pool.get("com.Joedobo27.WUmod.HerbDataJDB");
-        } catch (NotFoundException e) {
-            e.printStackTrace();
-        }
+    private static void setJSHerb() throws NotFoundException {
+        CtClass ctcHerb = pool.get("com.wurmonline.server.behaviours.Herb");
+        CtClass ctcHerbJDB = pool.get("com.Joedobo27.WUmod.HerbJDB");
+        CtClass ctcHerbDataJDB = pool.get("com.Joedobo27.WUmod.HerbDataJDB");
     }
 
-    public static void jsForageOverwrite() throws Exception{
+    public static void jsForageOverwrite() throws NotFoundException, CannotCompileException {
         CtClass ctcForageData = pool.getAndRename("com.Joedobo27.WUmod.ForageDataJDB", "com.wurmonline.server.behaviours.ForageData");
         ClassMap cmForageData = new ClassMap();
         cmForageData.put("com.Joedobo27.WUmod.ForageDataJDB", "com.wurmonline.server.behaviours.ForageData");
@@ -118,7 +93,7 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
 
     }
 
-    public static void jsHerbOverwrite() throws Exception{
+    public static void jsHerbOverwrite() throws NotFoundException, CannotCompileException {
         CtClass ctcHerbData = pool.getAndRename("com.Joedobo27.WUmod.HerbDataJDB", "com.wurmonline.server.behaviours.HerbData");
         ClassMap cmHerbData = new ClassMap();
         cmHerbData.put("com.Joedobo27.WUmod.HerbDataJDB", "com.wurmonline.server.behaviours.HerbData");
@@ -138,7 +113,11 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
         overwroteHerb = true;
     }
 
-    public static void jsCheckSaneAmountsExclusions() throws Exception {
+    public static void jsCheckSaneAmountsExclusions() throws NotFoundException, CannotCompileException, FileNotFoundException,
+            BadBytecode{
+        JDBByteCode jbt;
+        JDBByteCode jbt1;
+        String replaceResult;
         setJSCreationEntry();
         setJSSelf();
         //<editor-fold desc="Change information.">
@@ -150,38 +129,71 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
         - becomes: if (template.isCombine() && !largeMaterialRatioDifferentials.contains(this.objectCreated)) {
           add: a public static field of ArrayList to represent largeMaterialRatioDifferentials. Initialize the field with just
           ItemList.lye and use reflection to add other items relevant to the mod.
+
+        Add this field and initialization code.
+        - public static Arraylist<Integer> largeMaterialRatioDifferentials = new Arraylist(Arrays.asList(73));
         */
         //</editor-fold>
-        JDBByteCode jbt;
-        JDBByteCode jbt1;
-        String replaceResult;
-
-        CtMethod cmSetLargeMaterialRatioDifferentials1 = new CtMethod(CtClass.voidType, "setLargeMaterialRatioDifferentials", null, ctcCreationEntry);
-        ctcCreationEntry.addMethod(cmSetLargeMaterialRatioDifferentials1);
-
-        logger.log(Level.INFO, ctcSelf.getName());
-
-        CtMethod cmSetLargeMaterialRatioDifferentials2 = ctcSelf.getMethod("setLargeMaterialRatioDifferentials", "()V");
-        ClassMap map = new ClassMap();
-        map.put("com.Joedobo27.WUmod.aaaJoeCommon", "com.wurmonline.server.items.CreationEntry");
-        cmSetLargeMaterialRatioDifferentials1.setBody(cmSetLargeMaterialRatioDifferentials2, map);
-        ctcCreationEntry.setModifiers(ctcCreationEntry.getModifiers() & ~Modifier.ABSTRACT);
 
         FieldInfo f = new FieldInfo(cpCreationEntry, "largeMaterialRatioDifferentials", "Ljava/util/ArrayList;");
-        f.setAccessFlags(AccessFlag.PUBLIC);
-        f.setAccessFlags(AccessFlag.STATIC);
+        f.setAccessFlags(AccessFlag.PUBLIC | AccessFlag.STATIC);
         cfCreationEntry.addField(f);
 
+        // Modify the class static initiator to initiate largeMaterialRatioDifferentials and add int for lye.
+        // ******
+        setCreationEntryInit(cfCreationEntry,"()V", "<clinit>");
+        // insert gap for the code which will initialize the new largeMaterialRatioDifferentials field.
+        CEInitIterator.insertGap(18, 25);
+
+        // get ConstPool indexes for classes.
+        int creationEntryCPIndex = cpCreationEntry.addClassInfo("com/wurmonline/server/items/CreationEntry");
         int intCPIndex = cpCreationEntry.addClassInfo("java/lang/Integer");
-        int creationEntryCPIndex = Integer.valueOf(JDBByteCode.findConstantPoolReference(cpCreationEntry, ConstPool.CONST_Class, "com/wurmonline/server/items/CreationEntry"), 16);
         int arrayListCPIndex = cpCreationEntry.addClassInfo("java/util/ArrayList");
+        int arraysCPIndex = cpCreationEntry.addClassInfo("java/util/Arrays");
+        // Prepare find and replace.
+        jbt = new JDBByteCode();
+        jbt.setOpCodeStructure(new ArrayList<>(Arrays.asList(Opcode.ANEWARRAY, Opcode.PUTSTATIC, Opcode.NOP, Opcode.NOP, Opcode.NOP,
+                Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP,
+                Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP,
+                Opcode.NOP, Opcode.NOP, Opcode.RETURN)));
+        jbt.setOperandStructure(new ArrayList<>(Arrays.asList(
+                String.format("%04X", cpCreationEntry.addClassInfo("com/wurmonline/server/items/CreationRequirement") & 0xffff),
+                String.format("%04X", cpCreationEntry.addFieldrefInfo(creationEntryCPIndex, "emptyReqs", "[Lcom/wurmonline/server/items/CreationRequirement;") & 0xffff),
+                "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")));
+        jbt.setOpcodeOperand();
+
+        jbt1 = new JDBByteCode();
+        jbt1.setOpCodeStructure(new ArrayList<>(Arrays.asList(Opcode.NEW, Opcode.DUP, Opcode.ICONST_1,
+                Opcode.ANEWARRAY, Opcode.DUP, Opcode.ICONST_0, Opcode.BIPUSH, Opcode.INVOKESTATIC, Opcode.AASTORE, Opcode.INVOKESTATIC,
+                Opcode.INVOKESPECIAL, Opcode.PUTSTATIC, Opcode.RETURN)));
+        jbt1.setOperandStructure(new ArrayList<>(Arrays.asList(
+                String.format("%04X", cpCreationEntry.addClassInfo("java/util/ArrayList") & 0xffff),
+                "", "",
+                String.format("%04X", cpCreationEntry.addClassInfo("java/lang/Integer")),
+                "", "", "49",
+                String.format("%04X", cpCreationEntry.addMethodrefInfo(intCPIndex, "valueOf", "(I)Ljava/lang/Integer;")),
+                "",
+                String.format("%04X", cpCreationEntry.addMethodrefInfo(arraysCPIndex,"asList", "([Ljava/lang/Object;)Ljava/util/List;")),
+                String.format("%04X", cpCreationEntry.addMethodrefInfo(arrayListCPIndex, "<init>", "(Ljava/util/Collection;)V")),
+                String.format("%04X", cpCreationEntry.addFieldrefInfo(creationEntryCPIndex, "largeMaterialRatioDifferentials", "Ljava/util/ArrayList;")),
+                "")));
+        jbt1.setOpcodeOperand();
+
+        replaceResult = JDBByteCode.byteCodeFindReplace(jbt.getOpcodeOperand(), "00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,b1",
+                jbt1.getOpcodeOperand(), CEInitIterator, "<clinit>");
+        logger.log(Level.INFO, replaceResult);
+        CEInitAttribute.computeMaxStack();
+        CEInitMInfo.rebuildStackMapIf6(pool, cfCreationEntry);
+        JDBByteCode.byteCodePrint(CEInitIterator, "clinit",
+                "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Wurm Unlimited Dedicated Server\\byte code prints");
 
 
-
+        // Modify checkSaneAmounts() in CreationEntry.class
+        // ******
         setCheckSaneAmounts(cfCreationEntry,
                 "(Lcom/wurmonline/server/items/Item;ILcom/wurmonline/server/items/Item;ILcom/wurmonline/server/items/ItemTemplate;Lcom/wurmonline/server/creatures/Creature;Z)V",
                 "checkSaneAmounts");
-            getCheckSaneAmountsIterator().insertGap(395, 7);
+        checkSaneAmountsIterator.insertGap(395, 7);
         jbt = new JDBByteCode();
         jbt.setOpCodeStructure(new ArrayList<>(Arrays.asList(Opcode.ALOAD, Opcode.INVOKEVIRTUAL, Opcode.IFEQ, Opcode.NOP, Opcode.NOP, Opcode.NOP,
                 Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.ALOAD_0, Opcode.GETFIELD, Opcode.BIPUSH, Opcode.IF_ICMPEQ)));
@@ -197,7 +209,7 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
         jbt1.setOperandStructure(new ArrayList<>(Arrays.asList("05",
                 JDBByteCode.findConstantPoolReference(cpCreationEntry, ConstPool.CONST_Methodref, "com/wurmonline/server/items/ItemTemplate.isCombine:()Z"),
                 "0035",
-                String.format("%04X", cpCreationEntry.addFieldrefInfo(creationEntryCPIndex, "largeMaterialRatioDifferentials", "Ljava/util/ArrayList;") & 0xffff),
+                JDBByteCode.findConstantPoolReference(cpCreationEntry, ConstPool.CONST_Fieldref, "largeMaterialRatioDifferentials:Ljava/util/ArrayList;"),
                 "",
                 JDBByteCode.findConstantPoolReference(cpCreationEntry, ConstPool.CONST_Fieldref, "objectCreated:I"),
                 String.format("%04X", cpCreationEntry.addMethodrefInfo(intCPIndex, "valueOf", "(I)Ljava/lang/Integer;") & 0xffff),
@@ -205,14 +217,13 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
                 "0025"
                 )));
         jbt1.setOpcodeOperand();
-        replaceResult = JDBByteCode.byteCodeFindReplace(jbt.getOpcodeOperand(), jbt.getOpcodeOperand(), jbt1.getOpcodeOperand(), getCheckSaneAmountsIterator(),
+        replaceResult = JDBByteCode.byteCodeFindReplace(jbt.getOpcodeOperand(), jbt.getOpcodeOperand(), jbt1.getOpcodeOperand(), checkSaneAmountsIterator,
                 "checkSaneAmounts");
-        getCheckSaneAmountsMInfo().rebuildStackMapIf6(pool, cfCreationEntry);
-
         logger.log(Level.INFO, replaceResult);
-        JDBByteCode.byteCodePrint(getCheckSaneAmountsIterator(), "checkSaneAmounts",
+        checkSaneAmountsMInfo.rebuildStackMapIf6(pool, cfCreationEntry);
+        JDBByteCode.byteCodePrint(checkSaneAmountsIterator, "checkSaneAmounts",
                 "C:\\Program Files (x86)\\Steam\\SteamApps\\common\\Wurm Unlimited Dedicated Server\\byte code prints");
-        //modifiedCheckSaneAmounts = true;
+        modifiedCheckSaneAmounts = true;
     }
     //</editor-fold>
 
@@ -236,10 +247,23 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
         }
     }
 
-    private static CodeIterator getCheckSaneAmountsIterator(){return checkSaneAmountsIterator;}
-
-    private static CodeAttribute getCheckSaneAmountsAttribute(){return checkSaneAmountsAttribute;}
-
-    private static MethodInfo getCheckSaneAmountsMInfo(){return checkSaneAmountsMInfo;}
+    private static void  setCreationEntryInit(ClassFile cf, String desc, String name) {
+        if (CEInitMInfo == null || CEInitIterator == null || CEInitAttribute == null) {
+            for (List a : new List[]{cf.getMethods()}){
+                for(Object b : a){
+                    MethodInfo MInfo = (MethodInfo) b;
+                    if (Objects.equals(MInfo.getDescriptor(), desc) && Objects.equals(MInfo.getName(), name)){
+                        CEInitMInfo = MInfo;
+                        break;
+                    }
+                }
+            }
+            if (CEInitMInfo == null){
+                throw new NullPointerException();
+            }
+            CEInitAttribute = CEInitMInfo.getCodeAttribute();
+            CEInitIterator = CEInitAttribute.iterator();
+        }
+    }
     //</editor-fold>
 }

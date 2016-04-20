@@ -5,8 +5,8 @@ import java.util.Arrays;
 
 public class TestA {
 
-    public static ArrayList<Integer> largeMaterialRatioDifferentials;
-    int objectCreated;
+    public static ArrayList<Integer> largeMaterialRatioDifferentials = new ArrayList<>(Arrays.asList(73));
+    private int objectCreated;
 
     TestA(int a){
         this.objectCreated = a;
@@ -16,9 +16,5 @@ public class TestA {
         if (!largeMaterialRatioDifferentials.contains(this.objectCreated)){
             // bla bla
         }
-    }
-
-    public static ArrayList setLargeMaterialRatioDifferentials() {
-        return new ArrayList<>(Arrays.asList(73));
     }
 }
