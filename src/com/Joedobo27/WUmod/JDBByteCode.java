@@ -505,8 +505,6 @@ class JDBByteCode {
     }
 
     public static void constantPoolPrint(ConstPool cp, String clazz, String destinationPath) throws FileNotFoundException {
-        String rtn = "";
-
         Path printPath = Paths.get(destinationPath, clazz + " constant pool.txt");
         PrintWriter out = new PrintWriter(printPath.toFile());
         cp.print(out);

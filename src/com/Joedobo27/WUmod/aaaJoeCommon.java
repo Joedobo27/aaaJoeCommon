@@ -184,9 +184,6 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
         logger.log(Level.INFO, replaceResult);
         CEInitAttribute.computeMaxStack();
         CEInitMInfo.rebuildStackMapIf6(pool, cfCreationEntry);
-        JDBByteCode.byteCodePrint(CEInitIterator, "clinit",
-                "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Wurm Unlimited Dedicated Server\\byte code prints");
-
 
         // Modify checkSaneAmounts() in CreationEntry.class
         // ******
@@ -221,13 +218,11 @@ public class aaaJoeCommon implements WurmMod, Initable, ServerStartedListener {
                 "checkSaneAmounts");
         logger.log(Level.INFO, replaceResult);
         checkSaneAmountsMInfo.rebuildStackMapIf6(pool, cfCreationEntry);
-        JDBByteCode.byteCodePrint(checkSaneAmountsIterator, "checkSaneAmounts",
-                "C:\\Program Files (x86)\\Steam\\SteamApps\\common\\Wurm Unlimited Dedicated Server\\byte code prints");
         modifiedCheckSaneAmounts = true;
     }
     //</editor-fold>
 
-    //<editor-fold desc="Getter and Setter for CodeIterator, CodeAttribute, methodInfo.">
+    //<editor-fold desc="Setters for CodeIterator, CodeAttribute, methodInfo.">
     private static void setCheckSaneAmounts(ClassFile cf, String desc, String name) {
         if (checkSaneAmountsMInfo == null || checkSaneAmountsIterator == null || checkSaneAmountsAttribute == null) {
             for (List a : new List[]{cf.getMethods()}){
