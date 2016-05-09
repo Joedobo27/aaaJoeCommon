@@ -10,16 +10,29 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @SuppressWarnings({"unused", "WeakerAccess"})
 class JDBByteCode {
 
-    private static Logger logger = Logger.getLogger(JDBByteCode.class.getName());
     private ArrayList<Integer> opCodeStructure;
     private ArrayList<String > operandStructure;
     private String opcodeOperand;
     private static final String EMPTY_STRING = "";
+    private static final int EMPTY_INT = Integer.MAX_VALUE;
+
+    private static Logger logger;
+    static {
+        logger = Logger.getLogger(JDBByteCode.class.getName());
+        logger.setUseParentHandlers(false);
+        for (Handler a : logger.getHandlers()) {
+            logger.removeHandler(a);
+        }
+        logger.addHandler(aaaJoeCommon.joeFileHandler);
+        logger.setLevel(Level.FINE);
+    }
 
     /**
      * This method combines the values in opCodeStructure and operandStructure for its instance and sets the new value.
@@ -45,6 +58,64 @@ class JDBByteCode {
     }
 
     public String getOpcodeOperand() {return this.opcodeOperand;}
+
+
+    //// Method com/wurmonline/server/items/Item.getWeightGrams:()I
+    public static String findConstantPoolReference(ConstPool cp, String javapDesc) {
+        String[] splitDesc1;
+        String[] splitDesc2;
+        String refType = "";
+        String classInfo = "";
+        String name = "";
+        String descriptor = "";
+        int classConstPoolIndex = Integer.MAX_VALUE;
+        int poolIndex = Integer.MAX_VALUE;
+
+
+        splitDesc1 = javapDesc.split("[ .:]");
+        if (Objects.equals(splitDesc1[1], "String")) {
+            splitDesc2 = javapDesc.split("String ");
+            splitDesc1 = new String[]{"//", "String", splitDesc2[1]};
+        }
+
+        if (splitDesc1.length < 3 || splitDesc1.length > 5)
+            throw new UnsupportedOperationException();
+        if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field")) && splitDesc1.length == 3) {
+            throw new UnsupportedOperationException();
+        }
+
+        if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field")) && splitDesc1.length == 4) {
+            // The class reference is missing. This happens when a field or method is defined in the same class and javap
+            // assumes the reader is aware. addFieldrefInfo and addMethodrefInfo need specifics not assumptions.
+            classConstPoolIndex = cp.addClassInfo(cp.getClassName().replaceAll("/", "."));
+            name = splitDesc1[2];
+            name = name.replaceAll("\"", "");
+            descriptor = splitDesc1[3];
+        }
+        if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field")) && splitDesc1.length == 5) {
+            classConstPoolIndex = cp.addClassInfo(splitDesc1[2]);
+            name = splitDesc1[3];
+            name = name.replaceAll("\"", "");
+            descriptor = splitDesc1[4];
+        }
+        switch (splitDesc1[1]){
+            case "Method":
+                poolIndex = cp.addMethodrefInfo(classConstPoolIndex, name, descriptor);
+                break;
+            case "Field":
+                poolIndex = cp.addFieldrefInfo(classConstPoolIndex, name, descriptor);
+                break;
+            case "class":
+                poolIndex = cp.addClassInfo(splitDesc1[2]);
+                break;
+            case "String":
+                poolIndex = cp.addStringInfo(splitDesc1[2]);
+        }
+        if (Objects.equals(poolIndex, EMPTY_INT))
+            throw new UnsupportedOperationException();
+
+        return String.format("%04X", poolIndex & 0xffff);
+    }
 
     /**
      * This method looks for matches in the constantPool and returns found addresses.
@@ -124,7 +195,7 @@ class JDBByteCode {
                         }
                 }
             } catch (ClassCastException e) {
-            // This method does ConstPool information fetching that throws this exception often, ignore it.
+                // This method does ConstPool information fetching that throws this exception often, ignore it.
             }
             if (!Objects.equals(toReturn, EMPTY_STRING)) {
                 break;
