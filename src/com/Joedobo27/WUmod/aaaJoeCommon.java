@@ -37,8 +37,7 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
     public static FileHandler joeFileHandler;
     static {
         try {
-            joeFileHandler = new FileHandler(
-                    "C:\\Program Files (x86)\\Steam\\SteamApps\\common\\Wurm Unlimited Dedicated Server\\mods\\aaaJoeCommon.log");
+            joeFileHandler = new FileHandler("mods\\aaaJoeCommon.log");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -55,7 +54,7 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
     public void init() {
         pool = HookManager.getInstance().getClassPool();
         logger.log(Level.INFO, "aaaJoeCommon loaded.");
-}
+    }
 
     //<editor-fold desc="Javassist and bytecode altering section.">
     @Deprecated
@@ -141,7 +140,6 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
         setCreationEntryInit(cfCreationEntry,"()V", "<clinit>");
         // insert gap for the code which will initialize the new largeMaterialRatioDifferentials field.
         CEInitIterator.insertGap(18, 25);
-
         // Prepare find and replace.
         find = new JDBByteCode();
         find.setOpCodeStructure(new ArrayList<>(Arrays.asList(Opcode.ANEWARRAY, Opcode.PUTSTATIC, Opcode.NOP, Opcode.NOP, Opcode.NOP,
@@ -159,15 +157,15 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
                 Opcode.ANEWARRAY, Opcode.DUP, Opcode.ICONST_0, Opcode.BIPUSH, Opcode.INVOKESTATIC, Opcode.AASTORE, Opcode.INVOKESTATIC,
                 Opcode.INVOKESPECIAL, Opcode.PUTSTATIC, Opcode.RETURN)));
         replace.setOperandStructure(new ArrayList<>(Arrays.asList(
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// class java/util/ArrayList"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// class java/util/ArrayList"),
                 "", "",
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// class java/lang/Integer"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// class java/lang/Integer"),
                 "", "", "49",
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;"),
                 "",
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Method java/util/Arrays.asList:([Ljava/lang/Object;)Ljava/util/List;"),
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Method java/util/ArrayList.\"<init>\":(Ljava/util/Collection;)V"),
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Field largeMaterialRatioDifferentials:Ljava/util/ArrayList;"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// Method java/util/Arrays.asList:([Ljava/lang/Object;)Ljava/util/List;"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// Method java/util/ArrayList.\"<init>\":(Ljava/util/Collection;)V"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// Field largeMaterialRatioDifferentials:Ljava/util/ArrayList;"),
                 "")));
         replace.setOpcodeOperand();
 
@@ -181,7 +179,7 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
         /*
         Change checkSaneAmounts of CreationEntry to exclude certain items from a section that was bugging creation because of
         1) combine for all 2)large weight difference between finished item and one or both materials.
-                Lines 387 - 401
+                Lines 382 + and inserting at 390.
                 - was: if (template.isCombine() && this.objectCreated != 73)
             - becomes: if (template.isCombine() && !largeMaterialRatioDifferentials.contains(this.objectCreated)) {
             add: a public static field of ArrayList to represent largeMaterialRatioDifferentials.
@@ -190,7 +188,7 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
         setCheckSaneAmounts(cfCreationEntry,
                 "(Lcom/wurmonline/server/items/Item;ILcom/wurmonline/server/items/Item;ILcom/wurmonline/server/items/ItemTemplate;Lcom/wurmonline/server/creatures/Creature;Z)V",
                 "checkSaneAmounts");
-        checkSaneAmountsIterator.insertGap(395, 7);
+        checkSaneAmountsIterator.insertGap(390, 7);
         find = new JDBByteCode();
         find.setOpCodeStructure(new ArrayList<>(Arrays.asList(Opcode.ALOAD, Opcode.INVOKEVIRTUAL, Opcode.IFEQ, Opcode.NOP, Opcode.NOP, Opcode.NOP,
                 Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.NOP, Opcode.ALOAD_0, Opcode.GETFIELD, Opcode.BIPUSH, Opcode.IF_ICMPEQ)));
@@ -210,7 +208,7 @@ public class aaaJoeCommon implements WurmServerMod, Initable{
                 "",
                 JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Field objectCreated:I"),
                 JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;"),
-                JDBByteCode.findConstantPoolReference(cpCreationEntry, "// Method java/util/ArrayList.contains:(Ljava/lang/Object;)Z"),
+                JDBByteCode.addConstantPoolReference(cpCreationEntry, "// Method java/util/ArrayList.contains:(Ljava/lang/Object;)Z"),
                 "0025"
         )));
         replace.setOpcodeOperand();

@@ -23,6 +23,7 @@ class JDBByteCode {
     private static final String EMPTY_STRING = "";
     private static final int EMPTY_INT = Integer.MAX_VALUE;
 
+    @SuppressWarnings("FieldCanBeLocal")
     private static Logger logger;
     static {
         logger = Logger.getLogger(JDBByteCode.class.getName());
@@ -61,11 +62,11 @@ class JDBByteCode {
 
 
     //// Method com/wurmonline/server/items/Item.getWeightGrams:()I
-    public static String findConstantPoolReference(ConstPool cp, String javapDesc) {
+    public static String addConstantPoolReference(ConstPool cp, String javapDesc) {
         String[] splitDesc1;
         String[] splitDesc2;
-        String refType = "";
-        String classInfo = "";
+        //String refType = "";
+        //String classInfo = "";
         String name = "";
         String descriptor = "";
         int classConstPoolIndex = Integer.MAX_VALUE;
@@ -87,13 +88,21 @@ class JDBByteCode {
         if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field")) && splitDesc1.length == 4) {
             // The class reference is missing. This happens when a field or method is defined in the same class and javap
             // assumes the reader is aware. addFieldrefInfo and addMethodrefInfo need specifics not assumptions.
-            classConstPoolIndex = cp.addClassInfo(cp.getClassName().replaceAll("/", "."));
+            try {
+                classConstPoolIndex = Integer.valueOf(findConstantPoolReference(cp, "// class " + cp.getClassName().replaceAll("\\.", "/")), 16);
+            }catch (UnsupportedOperationException e) {
+                classConstPoolIndex = cp.addClassInfo(cp.getClassName().replaceAll("/", "."));
+            }
             name = splitDesc1[2];
             name = name.replaceAll("\"", "");
             descriptor = splitDesc1[3];
         }
         if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field")) && splitDesc1.length == 5) {
-            classConstPoolIndex = cp.addClassInfo(splitDesc1[2]);
+            try {
+                classConstPoolIndex = Integer.valueOf(findConstantPoolReference(cp, "// class " + splitDesc1[2].replaceAll("\\.", "/")), 16);
+            }catch (UnsupportedOperationException e) {
+                classConstPoolIndex = cp.addClassInfo(splitDesc1[2].replaceAll("/", "."));
+            }
             name = splitDesc1[3];
             name = name.replaceAll("\"", "");
             descriptor = splitDesc1[4];
@@ -106,7 +115,11 @@ class JDBByteCode {
                 poolIndex = cp.addFieldrefInfo(classConstPoolIndex, name, descriptor);
                 break;
             case "class":
-                poolIndex = cp.addClassInfo(splitDesc1[2]);
+                try {
+                    poolIndex = Integer.valueOf(findConstantPoolReference(cp, "// class " + splitDesc1[2].replaceAll("\\.", "/")), 16);
+                }catch (UnsupportedOperationException e) {
+                    poolIndex = cp.addClassInfo(splitDesc1[2].replaceAll("/", "."));
+                }
                 break;
             case "String":
                 poolIndex = cp.addStringInfo(splitDesc1[2]);
@@ -121,78 +134,105 @@ class JDBByteCode {
      * This method looks for matches in the constantPool and returns found addresses.
      *
      * @param cp is type ConstPool. This object is for accessing a specific ConstPool.
-     * @param const_type is a reference to static types in ConstantPool.CONST_*. It controls which switch branch is executed.
      * @param javapDesc is a string. This string data is copied directly from javap.exe data dump and represents a description
      *                  of its explanatory value in the constantPool.
      * @return is a string of 4 digits. These 4 numbers(in string form) are the address in the ConstantPool
      */
-    public static String findConstantPoolReference(ConstPool cp, int const_type, String javapDesc) {
-        String[] splitDesc;
-        String classPath = "";
+    public static String findConstantPoolReference(ConstPool cp, String javapDesc) {
+        String[] splitDesc1;
+        String[] splitDesc2;
+        String refClass = "";
+        String cpClass;
         String name = "";
-        String type = "";
-        String nameMatch;
-        String classInfo;
-        String stringValue;
+        String eqResult;
+        String descriptor = "";
+        int classConstPoolIndex = Integer.MAX_VALUE;
+        int poolIndex = Integer.MAX_VALUE;
         String toReturn = "";
+
+
+        splitDesc1 = javapDesc.split("[ .:]");
+        if (Objects.equals(splitDesc1[1], "String")) {
+            splitDesc2 = javapDesc.split("String ");
+            splitDesc1 = new String[]{"//", "String", splitDesc2[1]};
+        }
+        if (Objects.equals(splitDesc1[1], "float")) {
+            splitDesc2 = javapDesc.split("float ");
+            splitDesc1 = new String[]{"//", "float", splitDesc2[1]};
+        }
+
+        if (splitDesc1.length < 3 || splitDesc1.length > 5)
+            throw new UnsupportedOperationException();
+        if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field")) && splitDesc1.length == 3) {
+            throw new UnsupportedOperationException();
+        }
+
+        if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field") || Objects.equals(splitDesc1[1], "InterfaceMethod"))
+                && splitDesc1.length == 4) {
+            // The class reference is missing. This happens when a field or method is defined in the same class and javap
+            // assumes the reader is aware. ConstPool references still show the class reference even if the lines in methods don't.
+            //classConstPoolIndex = cp.addClassInfo(cp.getClassName().replaceAll("/", "."));
+            refClass = cp.getClassName();
+            refClass = refClass.replace("/", ".");
+            name = splitDesc1[2];
+            name = name.replaceAll("\"", "");
+            descriptor = splitDesc1[3];
+        }
+        if ( (Objects.equals(splitDesc1[1], "Method") || Objects.equals(splitDesc1[1], "Field") || Objects.equals(splitDesc1[1], "InterfaceMethod"))
+                && splitDesc1.length == 5) {
+            //classConstPoolIndex = cp.addClassInfo(splitDesc1[2]);
+            refClass = splitDesc1[2];
+            refClass = refClass.replace("/", ".");
+            name = splitDesc1[3];
+            name = name.replaceAll("\"", "");
+            descriptor = splitDesc1[4];
+        }
         for (int i = 1; i < cp.getSize(); i++) {
             try {
-                switch (const_type) {
-                    case ConstPool.CONST_InterfaceMethodref:
-                        break;
-                    case ConstPool.CONST_Methodref:
-                        splitDesc = javapDesc.split("[.:]");
-                        if (splitDesc.length == 3) {
-                            classPath = splitDesc[0].replaceAll("/", ".");
-                            name = splitDesc[1];
-                            type = splitDesc[2];
-                        }
-                        if (splitDesc.length == 2) {
-                            classPath = cp.getClassInfo(1);
-                            name = splitDesc[0];
-                            type = splitDesc[1];
-                        }
-                        nameMatch = cp.eqMember(name, type, i);
-                        classInfo = cp.getClassInfo(cp.getMethodrefClass(i));
-                        if (nameMatch != null && classInfo != null && Objects.equals(classInfo, classPath)) {
+                switch (splitDesc1[1]) {
+                    case "Method":
+                        eqResult = cp.eqMember(name, descriptor, i);
+                        cpClass = cp.getMethodrefClassName(i);
+                        if (eqResult != null && Objects.equals(refClass, cpClass))
                             toReturn = String.format("%04X", i & 0xffff);
-                        }
                         break;
-                    case ConstPool.CONST_String:
-                        stringValue = cp.getStringInfo(i);
-                        if (stringValue != null && Objects.equals(stringValue, javapDesc)) {
+                    case "String":
+                        String cpStr = cp.getStringInfo(i);
+                        String refStr = splitDesc1[2];
+                        if (cpStr != null && Objects.equals(cpStr, refStr))
                             toReturn = String.format("%04X", i & 0xffff);
-                        }
                         break;
-                    case ConstPool.CONST_Fieldref:
-                        splitDesc = javapDesc.split("[.:]");
-                        if (splitDesc.length == 3) {
-                            classPath = splitDesc[0].replaceAll("/", ".");
-                            name = splitDesc[1];
-                            type = splitDesc[2];
-                        }
-                        if (splitDesc.length == 2) {
-                            classPath = cp.getClassInfo(1);
-                            name = splitDesc[0];
-                            type = splitDesc[1];
-                        }
-                        nameMatch = cp.eqMember(name, type, i);
-                        classInfo = cp.getClassInfo(cp.getMethodrefClass(i));
-                        if (nameMatch != null && classInfo != null && Objects.equals(classInfo, classPath)) {
+                    case "Field":
+                        eqResult = cp.eqMember(name, descriptor, i);
+                        cpClass = cp.getMethodrefClassName(i);
+                        if (eqResult != null && Objects.equals(refClass, cpClass))
                             toReturn = String.format("%04X", i & 0xffff);
-                        }
                         break;
-                    case ConstPool.CONST_Class:
-                        stringValue = cp.getClassInfo(i);
-                        if (stringValue != null && Objects.equals(stringValue, javapDesc.replaceAll("/", "."))) {
+                    case "class":
+                        refClass = splitDesc1[2];
+                        refClass = refClass.replace("/", ".");
+                        cpClass = cp.getClassInfo(i);
+                        if (cpClass != null && Objects.equals(cpClass, refClass))
                             toReturn = String.format("%04X", i & 0xffff);
-                        }
                         break;
-                    case ConstPool.CONST_Long:
-                        Long l = cp.getLongInfo(i);
-                        if (Objects.equals(l, Long.valueOf(javapDesc))) {
+                    case "long":
+                        long cpLong = cp.getLongInfo(i);
+                        long refLong = Long.parseLong(splitDesc1[2].replace("l", ""), 10);
+                        if (Objects.equals(cpLong, refLong))
                             toReturn = String.format("%04X", i & 0xffff);
-                        }
+                        break;
+                    case "float":
+                        float cpFloat = cp.getFloatInfo(i);
+                        float refFloat = Float.parseFloat(splitDesc1[2].replace("f", ""));
+                        if (Objects.equals(cpFloat, refFloat))
+                            toReturn = String.format("%04X", i & 0xffff);
+                        break;
+                    case "InterfaceMethod":
+                        eqResult = cp.eqMember(name, descriptor, i);
+                        cpClass = cp.getInterfaceMethodrefClassName(i);
+                        if (eqResult != null && Objects.equals(refClass, cpClass))
+                            toReturn = String.format("%04X", i & 0xffff);
+                        break;
                 }
             } catch (ClassCastException e) {
                 // This method does ConstPool information fetching that throws this exception often, ignore it.
@@ -580,5 +620,20 @@ class JDBByteCode {
         PrintWriter out = new PrintWriter(printPath.toFile());
         cp.print(out);
         out.close();
+    }
+
+    /**
+     * This method is used to check if the JVM code matches a hash. It's primary purpose is to detected changes in WU
+     * vanilla code. When Javassist is used to replace an entire method body there is nothing that informs a mod author
+     * the code should be reviewed.
+     *
+     * @param ci type CodeIterator
+     * @return a hash value.
+     * @throws BadBytecode
+     */
+    public static int byteCodeHashCheck(CodeIterator ci) throws BadBytecode {
+        String s = byteCodeMakeArray(ci).toString();
+        char[] ch = s.toCharArray();
+        return Arrays.hashCode(ch);
     }
 }
